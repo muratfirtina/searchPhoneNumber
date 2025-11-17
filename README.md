@@ -14,13 +14,26 @@
 ## ✨ Özellikler
 
 ### 🤖 Agentic Arama Modu (YENİ!)
-Sistem artık **gerçek bir ajan gibi** çalışır:
+Sistem artık **gerçek bir ajan gibi** çalışır ve **çok kaynaklı** arama yapar:
 
+**Adım 1: Türk Telefon Rehberleri** 📚
+- `tdrehber.com` sitesinde ara
+- `telefonnumarasi.org.tr` sitesinde ara
+- `bulurum.com` sitesinde ara
+
+**Adım 2: Şirket Web Sitesi** 🌐
 1. **DuckDuckGo'da şirketi arar** (ücretsiz!)
 2. **Şirketin web sitesini bulur** (örn: `https://www.5starmetal.com.tr/`)
 3. **Web sitesine girer**
-4. **İletişim sayfasını arar** (`/iletisim`, `/contact`, `/hakkimizda`)
-5. **Telefon numarasını çıkarır**
+4. **İletişim sayfasını arar** - Gelişmiş tespit:
+   - Menu, footer, navigation alanlarına öncelik verir
+   - `/iletisim`, `/contact`, `/hakkimizda` sayfalarını bulur
+   - Link text'lerini de kontrol eder
+5. **Telefon numarasını akıllıca çıkarır**:
+   - `tel:` linklerini kontrol eder
+   - Telefon class/ID'li elementleri bulur
+   - "Tel:", "Telefon:" etiketlerini tanır
+   - Contact section'larını önceliklendirir
 
 ### 📋 Standart Arama Modu
 Klasik yöntem:
@@ -139,12 +152,25 @@ phone = searcher.find_phone_number("ACME İNŞAAT A.Ş.")
 🔍 [1/2] Aranıyor: 5 STAR METAL OTOMOTİV SANAYİ VE TİCARET LİMİTED ŞİRKETİ
 
 🔍 Agentic arama başlatılıyor: 5 STAR METAL OTOMOTİV SANAYİ VE TİCARET LİMİTED ŞİRKETİ
-   ✓ Web sitesi bulundu: https://www.5starmetal.com.tr/
-   📄 Ana sayfa taranıyor...
-   📇 2 iletişim sayfası bulundu
-   📄 Taranıyor: https://www.5starmetal.com.tr/iletisim
-   ✅ Telefon bulundu: 0212 555 12 34
+   📚 Telefon rehberi sitelerinde aranıyor...
+      → tdrehber.com kontrol ediliyor...
+      → telefonnumarasi.org.tr kontrol ediliyor...
+      ✓ telefonnumarasi.org.tr üzerinde bulundu
+   ✅ Telefon rehberinde bulundu: 0212 555 12 34
    ✔ Bulundu: 0212 555 12 34
+```
+
+**Veya web sitesinden bulma:**
+
+```
+🔍 Agentic arama başlatılıyor: ACME İNŞAAT A.Ş.
+   📚 Telefon rehberi sitelerinde aranıyor...
+      → tdrehber.com kontrol ediliyor...
+   ✓ Web sitesi bulundu: https://www.acmeinsaat.com.tr/
+   📄 Ana sayfa taranıyor...
+   📇 3 iletişim sayfası bulundu
+   📄 Taranıyor: https://www.acmeinsaat.com.tr/iletisim
+   ✅ Telefon bulundu: 0216 444 55 66
 ```
 
 ## 🔍 Nasıl Çalışır?
@@ -153,32 +179,48 @@ phone = searcher.find_phone_number("ACME İNŞAAT A.Ş.")
 
 ```
 ┌─────────────────────────────────────────────┐
-│  1. DuckDuckGo'da şirket adını ara          │
+│  1. Türk Telefon Rehberlerinde Ara          │
+│     ├─ tdrehber.com                         │
+│     ├─ telefonnumarasi.org.tr               │
+│     └─ bulurum.com                          │
+│  BULUNDU MU? → EVET: DÖNDÜR ✅               │
+└─────────────────────────────────────────────┘
+                    ↓ HAYIR
+┌─────────────────────────────────────────────┐
+│  2. DuckDuckGo'da şirket adını ara          │
 │     └─ TAMAMEN ÜCRETSİZ - API KEY YOK!      │
 └─────────────────────────────────────────────┘
                     ↓
 ┌─────────────────────────────────────────────┐
-│  2. Şirketin web sitesini bul               │
+│  3. Şirketin web sitesini bul               │
 │     └─ Geçerli domain'i tespit et           │
 │     └─ PDF, sosyal medya vb. filtrele       │
+│     └─ Telefon rehberi sitelerini KABUL ET  │
 └─────────────────────────────────────────────┘
                     ↓
 ┌─────────────────────────────────────────────┐
-│  3. Ana sayfayı tara                        │
-│     └─ Telefon numarası var mı kontrol et   │
+│  4. Ana sayfayı akıllıca tara               │
+│     ├─ tel: linklerini kontrol et           │
+│     ├─ Telefon class/ID'leri ara            │
+│     ├─ "Tel:", "Telefon:" etiketleri bul    │
+│     └─ Contact section'larına bak           │
+│  BULUNDU MU? → EVET: DÖNDÜR ✅               │
 └─────────────────────────────────────────────┘
-                    ↓
+                    ↓ HAYIR
 ┌─────────────────────────────────────────────┐
-│  4. İletişim sayfalarını bul                │
-│     └─ Tüm linkleri tara                    │
+│  5. İletişim sayfalarını bul (Gelişmiş)    │
+│     ├─ Menu/Footer/Nav öncelikli tara       │
+│     ├─ Link text'lerini de kontrol et       │
 │     └─ Pattern eşleştir (iletisim, contact) │
 └─────────────────────────────────────────────┘
                     ↓
 ┌─────────────────────────────────────────────┐
-│  5. İletişim sayfalarını tara               │
-│     └─ Her sayfayı fetch et                 │
-│     └─ BeautifulSoup ile parse et           │
-│     └─ Regex ile telefon çıkar              │
+│  6. İletişim sayfalarını akıllıca tara      │
+│     ├─ tel: linkleri (en güvenilir)         │
+│     ├─ Telefon class/ID'li elementler       │
+│     ├─ "Tel:", "Telefon:" etiketleri        │
+│     ├─ Contact section'lar                  │
+│     └─ Genel regex tarama                   │
 └─────────────────────────────────────────────┘
 ```
 
@@ -203,6 +245,8 @@ phone = searcher.find_phone_number("ACME İNŞAAT A.Ş.")
 - Marketplace: `sahibinden.com`, `hepsiburada.com`, `n11.com`
 - Diğer: `wikipedia.org`, `google.com`
 - Dosya formatları: `.pdf`, `.doc`, `.xls`
+
+**ÖNEMLİ:** Telefon rehberi siteleri (`tdrehber.com`, `telefonnumarasi.org.tr`, `bulurum.com`) **ASLA** filtrelenmez ve her zaman taranır!
 
 ## 📚 Dosya Yapısı
 

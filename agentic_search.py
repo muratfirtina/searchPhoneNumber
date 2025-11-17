@@ -1,14 +1,15 @@
 """
 Agentic Phone Number Search Module
 ===================================
-Bu modül şirket web sitelerini bulup, iletişim sayfalarını tarayarak
+Bu modül şirket web sitelerini ve Türk telefon rehberi sitelerini tarayarak
 telefon numaralarını çıkarır.
 
 Çalışma Mantığı:
-1. DuckDuckGo'da şirket adını ara (TAMAMEN ÜCRETSİZ, API KEY GEREKMİYOR!)
-2. Şirketin resmi web sitesini bul
-3. Web sitesinde iletişim/contact sayfalarını ara
-4. Telefon numaralarını çıkar
+1. Türk telefon rehberi sitelerinde ara (tdrehber.com, telefonnumarasi.org.tr, bulurum.com)
+2. DuckDuckGo'da şirket adını ara (TAMAMEN ÜCRETSİZ, API KEY GEREKMİYOR!)
+3. Şirketin resmi web sitesini bul
+4. Web sitesinde iletişim/contact sayfalarını ara
+5. Telefon numaralarını çıkar
 """
 
 import re
@@ -39,7 +40,16 @@ class AgenticPhoneSearcher:
         'iletişim',
         'hakkımızda',
         'adres',
-        'address'
+        'address',
+        'kundenservice',
+        'impressum'
+    ]
+
+    # Türk telefon rehberi siteleri
+    PHONE_DIRECTORY_SITES = [
+        'tdrehber.com',
+        'telefonnumarasi.org.tr',
+        'bulurum.com'
     ]
 
     def __init__(self, timeout: int = 10, max_pages: int = 5):
@@ -61,6 +71,11 @@ class AgenticPhoneSearcher:
         """
         Verilen şirket adı için telefon numarası bul
 
+        Arama Stratejisi:
+        1. Türk telefon rehberi sitelerinde ara (daha hızlı ve güvenilir)
+        2. Şirketin kendi web sitesini bul ve iletişim sayfalarını tara
+        3. DuckDuckGo genel arama sonuçlarından ara
+
         Args:
             company_name: Şirket adı
 
@@ -69,23 +84,70 @@ class AgenticPhoneSearcher:
         """
         print(f"\n🔍 Agentic arama başlatılıyor: {company_name}")
 
-        # 1. Şirketin web sitesini bul
-        website_url = self._find_company_website(company_name)
-        if not website_url:
-            print("   ⚠ Web sitesi bulunamadı")
-            return None
-
-        print(f"   ✓ Web sitesi bulundu: {website_url}")
-
-        # 2. İletişim sayfalarını bul ve tara
-        phone = self._search_website_for_phone(website_url, company_name)
-
+        # 1. Önce telefon rehberi sitelerinde ara
+        print("   📚 Telefon rehberi sitelerinde aranıyor...")
+        phone = self._search_phone_directories(company_name)
         if phone:
-            print(f"   ✅ Telefon bulundu: {phone}")
-        else:
-            print("   ❌ Telefon bulunamadı")
+            print(f"   ✅ Telefon rehberinde bulundu: {phone}")
+            return phone
 
-        return phone
+        # 2. Şirketin web sitesini bul
+        website_url = self._find_company_website(company_name)
+        if website_url:
+            print(f"   ✓ Web sitesi bulundu: {website_url}")
+
+            # 3. İletişim sayfalarını bul ve tara
+            phone = self._search_website_for_phone(website_url, company_name)
+            if phone:
+                print(f"   ✅ Telefon bulundu: {phone}")
+                return phone
+
+        print("   ❌ Telefon bulunamadı")
+        return None
+
+    def _search_phone_directories(self, company_name: str) -> Optional[str]:
+        """
+        Türk telefon rehberi sitelerinde şirket ara
+
+        Args:
+            company_name: Şirket adı
+
+        Returns:
+            Bulunan telefon numarası veya None
+        """
+        # DuckDuckGo ile rehber sitelerinde ara
+        try:
+            with DDGS() as ddgs:
+                # Telefon rehberi sitelerinde ara
+                for directory_site in self.PHONE_DIRECTORY_SITES:
+                    try:
+                        query = f"site:{directory_site} {company_name}"
+                        results = list(ddgs.text(
+                            keywords=query,
+                            region='tr-tr',
+                            safesearch='off',
+                            max_results=3
+                        ))
+
+                        if results:
+                            print(f"      → {directory_site} kontrol ediliyor...")
+
+                        # Bulunan sayfaları tara
+                        for result in results:
+                            link = result.get('href', '') or result.get('link', '')
+                            if link and directory_site in link:
+                                phone = self._extract_phone_from_page(link)
+                                if phone:
+                                    print(f"      ✓ {directory_site} üzerinde bulundu")
+                                    return phone
+
+                    except Exception as e:
+                        continue
+
+        except Exception as e:
+            print(f"   ⚠ Telefon rehberi arama hatası: {e}")
+
+        return None
 
     def _find_company_website(self, company_name: str) -> Optional[str]:
         """
@@ -141,6 +203,7 @@ class AgenticPhoneSearcher:
             return False
 
         # Sosyal medya, marketplace vb. siteleri atla
+        # ANCAK telefon rehberi sitelerini KABUL ET
         excluded_domains = [
             'facebook.com', 'twitter.com', 'instagram.com', 'linkedin.com',
             'youtube.com', 'sahibinden.com', 'hepsiburada.com', 'n11.com',
@@ -150,6 +213,12 @@ class AgenticPhoneSearcher:
         parsed = urlparse(url)
         domain = parsed.netloc.lower()
 
+        # Telefon rehberi siteleri her zaman geçerlidir
+        for directory_site in self.PHONE_DIRECTORY_SITES:
+            if directory_site in domain:
+                return True
+
+        # Diğer excluded domain'leri kontrol et
         for excluded in excluded_domains:
             if excluded in domain:
                 return False
@@ -191,6 +260,7 @@ class AgenticPhoneSearcher:
     def _find_contact_pages(self, base_url: str) -> List[str]:
         """
         Web sitesinde iletişim sayfalarını bul
+        Gelişmiş tespit: menu, footer, navigation ve tüm linkler
 
         Args:
             base_url: Ana web sitesi URL'i
@@ -206,17 +276,37 @@ class AgenticPhoneSearcher:
 
             soup = BeautifulSoup(response.content, 'lxml')
 
-            # Tüm linkleri tara
+            # Öncelikli alanlar: menu, footer, nav
+            priority_areas = soup.find_all(['nav', 'footer', 'menu', 'header'])
+
+            # Önce öncelikli alanlardaki linkleri tara
+            for area in priority_areas:
+                for link in area.find_all('a', href=True):
+                    href = link['href'].lower()
+                    link_text = link.get_text().lower()
+
+                    # İletişim sayfası pattern'i var mı kontrol et (href veya link text'te)
+                    for pattern in self.CONTACT_PAGE_PATTERNS:
+                        if pattern in href or pattern in link_text:
+                            # Relative URL'i absolute'a çevir
+                            full_url = urljoin(base_url, link['href'])
+
+                            if full_url not in contact_pages and base_url in full_url:
+                                contact_pages.append(full_url)
+                            break
+
+            # Sonra tüm linkleri tara
             for link in soup.find_all('a', href=True):
                 href = link['href'].lower()
+                link_text = link.get_text().lower()
 
                 # İletişim sayfası pattern'i var mı kontrol et
                 for pattern in self.CONTACT_PAGE_PATTERNS:
-                    if pattern in href:
+                    if pattern in href or pattern in link_text:
                         # Relative URL'i absolute'a çevir
                         full_url = urljoin(base_url, link['href'])
 
-                        if full_url not in contact_pages:
+                        if full_url not in contact_pages and base_url in full_url:
                             contact_pages.append(full_url)
                         break
 
@@ -228,6 +318,7 @@ class AgenticPhoneSearcher:
     def _extract_phone_from_page(self, url: str) -> Optional[str]:
         """
         Belirtilen sayfadan telefon numarası çıkar
+        Gelişmiş tespit: tel: linkleri, özel class'lar, contact alanları
 
         Args:
             url: Sayfa URL'i
@@ -239,25 +330,66 @@ class AgenticPhoneSearcher:
             response = self.session.get(url, timeout=self.timeout)
             response.raise_for_status()
 
-            # HTML'den telefon numarası ara
-            match = self.PHONE_REGEX.search(response.text)
-            if match:
-                return self._clean_phone_number(match.group(0))
-
-            # Daha temiz arama için BeautifulSoup kullan
             soup = BeautifulSoup(response.content, 'lxml')
 
-            # Telefon numarası içerebilecek tag'leri ara
-            for tag in soup.find_all(['p', 'span', 'div', 'a', 'li']):
-                text = tag.get_text()
+            # 1. Önce tel: linklerini kontrol et (en güvenilir)
+            tel_links = soup.find_all('a', href=re.compile(r'^tel:', re.I))
+            for link in tel_links:
+                href = link.get('href', '')
+                # tel: kısmını kaldır ve temizle
+                phone_text = href.replace('tel:', '').replace('Tel:', '')
+                match = self.PHONE_REGEX.search(phone_text)
+                if match:
+                    return self._clean_phone_number(match.group(0))
+
+            # 2. Telefon ile ilgili class/id'lere sahip elementleri ara
+            phone_keywords = ['phone', 'tel', 'telefon', 'contact', 'iletisim']
+            for keyword in phone_keywords:
+                # Class içinde anahtar kelime olanları bul
+                elements = soup.find_all(class_=re.compile(keyword, re.I))
+                for elem in elements:
+                    text = elem.get_text()
+                    match = self.PHONE_REGEX.search(text)
+                    if match:
+                        return self._clean_phone_number(match.group(0))
+
+                # ID içinde anahtar kelime olanları bul
+                elements = soup.find_all(id=re.compile(keyword, re.I))
+                for elem in elements:
+                    text = elem.get_text()
+                    match = self.PHONE_REGEX.search(text)
+                    if match:
+                        return self._clean_phone_number(match.group(0))
+
+            # 3. "Tel:", "Telefon:", "Phone:" gibi etiketlerin yanındaki numaraları ara
+            text_content = soup.get_text()
+            phone_label_pattern = r'(?:tel|telefon|phone|gsm|fax|faks)[\s:]+' + self.PHONE_REGEX.pattern
+            match = re.search(phone_label_pattern, text_content, re.IGNORECASE)
+            if match:
+                phone_match = self.PHONE_REGEX.search(match.group(0))
+                if phone_match:
+                    return self._clean_phone_number(phone_match.group(0))
+
+            # 4. Contact/iletişim section'larını ara
+            contact_sections = soup.find_all(['section', 'div'],
+                class_=re.compile(r'contact|iletisim|iletişim', re.I))
+            for section in contact_sections:
+                text = section.get_text()
                 match = self.PHONE_REGEX.search(text)
                 if match:
                     return self._clean_phone_number(match.group(0))
 
+            # 5. Genel arama - tüm sayfa
+            match = self.PHONE_REGEX.search(response.text)
+            if match:
+                return self._clean_phone_number(match.group(0))
+
             return None
 
         except Exception as e:
-            print(f"   ⚠ Sayfa okuma hatası ({url}): {e}")
+            # Sessizce hata ver, çok fazla log kalabalığı olmasın
+            if "timeout" not in str(e).lower():
+                print(f"   ⚠ Sayfa okuma hatası: {str(e)[:50]}")
             return None
 
     def _clean_phone_number(self, phone: str) -> str:
