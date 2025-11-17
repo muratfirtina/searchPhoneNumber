@@ -1,13 +1,13 @@
 import pandas as pd
 import re
 import requests
-from serpapi import GoogleSearch
+from duckduckgo_search import DDGS
 from agentic_search import AgenticPhoneSearcher
 
 # -----------------------------------
 # Ayarlar
 # -----------------------------------
-SERPAPI_KEY = "BURAYA_API_KEYİNİ_YAZ"  # ← senin API key
+# 🆓 TAMAMEN ÜCRETSİZ! API KEY GEREKMİYOR!
 
 INPUT_EXCEL = "/mnt/data/firma_listesi.xlsx"
 OUTPUT_EXCEL = "/mnt/data/firma_listesi_sonuclu.xlsx"
@@ -20,55 +20,54 @@ PHONE_REGEX = re.compile(
 )
 
 # -----------------------------------
-# SerpAPI Üzerinden Telefon Bulan Fonksiyon
+# DuckDuckGo ile Standart Telefon Arama
+# 🆓 TAMAMEN ÜCRETSİZ - API KEY GEREKMİYOR!
 # -----------------------------------
-def find_phone_with_serpapi(query):
+def find_phone_with_duckduckgo(query):
+    """
+    DuckDuckGo ile basit arama yap (snippet'lerden telefon ara)
+    Fallback fonksiyon - Agentic arama başarısız olursa kullanılır
+    """
     try:
-        params = {
-            "engine": "google",
-            "q": query + " telefon",
-            "hl": "tr",
-            "gl": "tr",
-            "api_key": SERPAPI_KEY,
-        }
+        # DuckDuckGo ile arama
+        with DDGS() as ddgs:
+            results = list(ddgs.text(
+                keywords=query + " telefon",
+                region='tr-tr',
+                safesearch='off',
+                max_results=5
+            ))
 
-        search = GoogleSearch(params)
-        results = search.get_dict()
+        # 1) Snippet'lerden telefon ara
+        for result in results:
+            title = result.get('title', '')
+            body = result.get('body', '')
+            text = title + " " + body
 
-        # 1) Direct Answers / Knowledge Graph
-        if "knowledge_graph" in results:
-            kg = results["knowledge_graph"]
-            if "phone" in kg:
-                return kg["phone"]
+            match = PHONE_REGEX.search(text)
+            if match:
+                return match.group(0)
 
-        # 2) Organic Results → Titles + Snippets
-        if "organic_results" in results:
-            for item in results["organic_results"]:
-                text = (item.get("title", "") + " " + item.get("snippet", ""))
-                match = PHONE_REGEX.search(text)
-                if match:
-                    return match.group(0)
-
-        # 3) HTML sayfası içinde arama
-        if "organic_results" in results:
-            for item in results["organic_results"]:
-                if "link" in item:
-                    try:
-                        resp = requests.get(
-                            item["link"],
-                            timeout=8,
-                            headers={"User-Agent": "Mozilla/5.0"},
-                        )
-                        match = PHONE_REGEX.search(resp.text)
-                        if match:
-                            return match.group(0)
-                    except:
-                        pass
+        # 2) URL'lerden telefon ara
+        for result in results:
+            link = result.get('href', '') or result.get('link', '')
+            if link:
+                try:
+                    resp = requests.get(
+                        link,
+                        timeout=8,
+                        headers={"User-Agent": "Mozilla/5.0"},
+                    )
+                    match = PHONE_REGEX.search(resp.text)
+                    if match:
+                        return match.group(0)
+                except:
+                    pass
 
         return None
 
     except Exception as e:
-        print("HATA (SerpAPI):", e)
+        print(f"   ⚠ DuckDuckGo hatası: {e}")
         return None
 
 
@@ -91,10 +90,12 @@ if telefon_col not in df.columns:
 # Agentic searcher'ı başlat (eğer kullanılacaksa)
 agentic_searcher = None
 if USE_AGENTIC_SEARCH:
-    agentic_searcher = AgenticPhoneSearcher(SERPAPI_KEY)
-    print("✨ Agentic arama modu aktif (Web sitesi bulup iletişim sayfasına girecek)\n")
+    agentic_searcher = AgenticPhoneSearcher()  # API KEY GEREKMİYOR!
+    print("🆓 ✨ TAMAMEN ÜCRETSİZ Agentic arama modu aktif!")
+    print("   (Web sitesi bulup iletişim sayfasına girecek)\n")
 else:
-    print("📋 Standart arama modu aktif (Sadece snippet'lerden arayacak)\n")
+    print("🆓 📋 TAMAMEN ÜCRETSİZ Standart arama modu aktif!")
+    print("   (Sadece snippet'lerden arayacak)\n")
 
 for i, row in df.iterrows():
     firma = str(row[firma_col]).strip()
@@ -106,11 +107,11 @@ for i, row in df.iterrows():
     if USE_AGENTIC_SEARCH and agentic_searcher:
         phone = agentic_searcher.find_phone_number(firma)
 
-    # Agentic arama başarısız olduysa veya kullanılmıyorsa, eski yöntemi dene
+    # Agentic arama başarısız olduysa veya kullanılmıyorsa, standart DuckDuckGo aramayı dene
     if not phone:
         if USE_AGENTIC_SEARCH:
             print("   ⚠ Agentic arama başarısız, standart aramaya geçiliyor...")
-        phone = find_phone_with_serpapi(firma)
+        phone = find_phone_with_duckduckgo(firma)
 
     if phone:
         print(f"   ✔ Bulundu: {phone}")

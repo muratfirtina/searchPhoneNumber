@@ -5,7 +5,7 @@ Bu modül şirket web sitelerini bulup, iletişim sayfalarını tarayarak
 telefon numaralarını çıkarır.
 
 Çalışma Mantığı:
-1. Google'da şirket adını ara
+1. DuckDuckGo'da şirket adını ara (TAMAMEN ÜCRETSİZ, API KEY GEREKMİYOR!)
 2. Şirketin resmi web sitesini bul
 3. Web sitesinde iletişim/contact sayfalarını ara
 4. Telefon numaralarını çıkar
@@ -17,10 +17,11 @@ from bs4 import BeautifulSoup
 from urllib.parse import urljoin, urlparse
 import time
 from typing import Optional, List, Dict
+from duckduckgo_search import DDGS
 
 
 class AgenticPhoneSearcher:
-    """Agentic telefon numarası arama sınıfı"""
+    """Agentic telefon numarası arama sınıfı - TAMAMEN ÜCRETSİZ!"""
 
     # Türk telefon numarası regex pattern
     PHONE_REGEX = re.compile(
@@ -41,14 +42,14 @@ class AgenticPhoneSearcher:
         'address'
     ]
 
-    def __init__(self, serpapi_key: str, timeout: int = 10, max_pages: int = 5):
+    def __init__(self, timeout: int = 10, max_pages: int = 5):
         """
         Args:
-            serpapi_key: SerpAPI anahtarı
             timeout: HTTP request timeout (saniye)
             max_pages: Taranacak maksimum sayfa sayısı
+
+        NOT: API KEY GEREKMİYOR! Tamamen ücretsiz DuckDuckGo kullanılıyor.
         """
-        self.serpapi_key = serpapi_key
         self.timeout = timeout
         self.max_pages = max_pages
         self.session = requests.Session()
@@ -88,7 +89,8 @@ class AgenticPhoneSearcher:
 
     def _find_company_website(self, company_name: str) -> Optional[str]:
         """
-        Google arama sonuçlarından şirketin web sitesini bul
+        DuckDuckGo arama sonuçlarından şirketin web sitesini bul
+        TAMAMEN ÜCRETSİZ - API KEY GEREKMİYOR!
 
         Args:
             company_name: Şirket adı
@@ -97,32 +99,27 @@ class AgenticPhoneSearcher:
             Web sitesi URL'i veya None
         """
         try:
-            from serpapi import GoogleSearch
+            # DuckDuckGo ile arama yap
+            with DDGS() as ddgs:
+                results = list(ddgs.text(
+                    keywords=company_name,
+                    region='tr-tr',
+                    safesearch='off',
+                    max_results=5
+                ))
 
-            params = {
-                "engine": "google",
-                "q": company_name,
-                "hl": "tr",
-                "gl": "tr",
-                "api_key": self.serpapi_key,
-            }
+            # Sonuçlardan web sitesi bul
+            for result in results:
+                link = result.get('href', '') or result.get('link', '')
 
-            search = GoogleSearch(params)
-            results = search.get_dict()
-
-            # Organic results'tan web sitesi bul
-            if "organic_results" in results:
-                for item in results["organic_results"][:3]:  # İlk 3 sonuca bak
-                    link = item.get("link", "")
-
-                    # Geçerli bir web sitesi URL'i mi kontrol et
-                    if self._is_valid_website_url(link):
-                        return link
+                # Geçerli bir web sitesi URL'i mi kontrol et
+                if self._is_valid_website_url(link):
+                    return link
 
             return None
 
         except Exception as e:
-            print(f"   ⚠ Google arama hatası: {e}")
+            print(f"   ⚠ DuckDuckGo arama hatası: {e}")
             return None
 
     def _is_valid_website_url(self, url: str) -> bool:
@@ -279,27 +276,27 @@ class AgenticPhoneSearcher:
 
 
 # Standalone kullanım için yardımcı fonksiyon
-def search_phone_agentic(company_name: str, serpapi_key: str) -> Optional[str]:
+def search_phone_agentic(company_name: str) -> Optional[str]:
     """
     Agentic arama ile telefon numarası bul (standalone fonksiyon)
+    TAMAMEN ÜCRETSİZ - API KEY GEREKMİYOR!
 
     Args:
         company_name: Şirket adı
-        serpapi_key: SerpAPI anahtarı
 
     Returns:
         Bulunan telefon numarası veya None
     """
-    searcher = AgenticPhoneSearcher(serpapi_key)
+    searcher = AgenticPhoneSearcher()
     return searcher.find_phone_number(company_name)
 
 
 if __name__ == "__main__":
-    # Test
+    # Test - API KEY GEREKMİYOR!
     test_company = "5 STAR METAL OTOMOTİV SANAYİ VE TİCARET LİMİTED ŞİRKETİ"
-    api_key = "BURAYA_API_KEYİNİ_YAZ"
 
-    result = search_phone_agentic(test_company, api_key)
+    print("🆓 TAMAMEN ÜCRETSİZ ARAMA - API KEY GEREKMİYOR!")
+    result = search_phone_agentic(test_company)
     print(f"\n{'='*50}")
     print(f"Şirket: {test_company}")
     print(f"Sonuç: {result if result else 'Bulunamadı'}")

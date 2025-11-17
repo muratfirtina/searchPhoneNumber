@@ -1,13 +1,22 @@
 # 🔍 Agentic Phone Number Finder (Telefon Numarası Bulucu)
 
+🆓 **TAMAMEN ÜCRETSİZ** - API KEY GEREKMİYOR!
+
 Şirket telefon numaralarını otomatik olarak bulan, **agentic** (otonom) arama özellikli Python uygulaması.
+
+## 🆓 Neden Bu Araç?
+
+- ✅ **TAMAMEN ÜCRETSİZ** - Hiçbir API key veya ücretli servis gerekmez
+- ✅ **DuckDuckGo Kullanır** - Açık ve ücretsiz arama motoru
+- ✅ **Akıllı Web Scraping** - Gerçek web sitelerini ziyaret eder
+- ✅ **Sınırsız Kullanım** - Hiçbir API limiti yok
 
 ## ✨ Özellikler
 
 ### 🤖 Agentic Arama Modu (YENİ!)
 Sistem artık **gerçek bir ajan gibi** çalışır:
 
-1. **Google'da şirketi arar**
+1. **DuckDuckGo'da şirketi arar** (ücretsiz!)
 2. **Şirketin web sitesini bulur** (örn: `https://www.5starmetal.com.tr/`)
 3. **Web sitesine girer**
 4. **İletişim sayfasını arar** (`/iletisim`, `/contact`, `/hakkimizda`)
@@ -15,9 +24,9 @@ Sistem artık **gerçek bir ajan gibi** çalışır:
 
 ### 📋 Standart Arama Modu
 Klasik yöntem:
-- Google arama sonuçlarındaki snippet'lerden telefon arar
-- Knowledge Graph verilerini kontrol eder
+- DuckDuckGo arama sonuçlarındaki snippet'lerden telefon arar
 - İlk sonuç URL'lerini tarar
+- Fallback olarak kullanılır
 
 ## 🚀 Kurulum
 
@@ -27,17 +36,13 @@ Klasik yöntem:
 pip install -r requirements.txt
 ```
 
-### 2. SerpAPI Anahtarı Alın
+**Hepsi bu kadar! API key gerekmez!** 🎉
 
-[SerpAPI](https://serpapi.com/) sitesinden ücretsiz API anahtarı alın.
-
-### 3. Ayarları Yapın
+### 2. Ayarları Yapın (İsteğe Bağlı)
 
 `telefon_bulucu.py` dosyasında:
 
 ```python
-SERPAPI_KEY = "BURAYA_API_KEYİNİ_YAZ"  # API anahtarınızı buraya yazın
-
 # Agentic arama kullanılsın mı?
 USE_AGENTIC_SEARCH = True  # True = Agentic, False = Standart
 
@@ -45,6 +50,8 @@ USE_AGENTIC_SEARCH = True  # True = Agentic, False = Standart
 INPUT_EXCEL = "/mnt/data/firma_listesi.xlsx"
 OUTPUT_EXCEL = "/mnt/data/firma_listesi_sonuclu.xlsx"
 ```
+
+**NOT:** Hiçbir API anahtarı veya kayıt gerekmez!
 
 ## 📝 Kullanım
 
@@ -81,10 +88,10 @@ python telefon_bulucu.py
 
 ```python
 searcher = AgenticPhoneSearcher(
-    serpapi_key=SERPAPI_KEY,
     timeout=10,        # HTTP timeout (saniye)
     max_pages=5        # Taranacak maksimum sayfa sayısı
 )
+# API KEY GEREKMİYOR! 🆓
 ```
 
 ### İletişim Sayfası Pattern'leri
@@ -101,31 +108,33 @@ Daha fazla pattern eklemek için `agentic_search.py` içindeki `CONTACT_PAGE_PAT
 
 ## 🎯 Örnek Kullanım
 
-### Standalone Agentic Search
+### Standalone Agentic Search - 🆓 API KEY GEREKMİYOR!
 
 ```python
 from agentic_search import search_phone_agentic
 
 company = "5 STAR METAL OTOMOTİV SANAYİ VE TİCARET LİMİTED ŞİRKETİ"
-api_key = "YOUR_API_KEY"
 
-phone = search_phone_agentic(company, api_key)
+# API KEY GEREKMİYOR! Direkt kullanın:
+phone = search_phone_agentic(company)
 print(f"Telefon: {phone}")
 ```
 
-### Class Kullanımı
+### Class Kullanımı - 🆓 API KEY GEREKMİYOR!
 
 ```python
 from agentic_search import AgenticPhoneSearcher
 
-searcher = AgenticPhoneSearcher("YOUR_API_KEY")
+# API KEY GEREKMİYOR!
+searcher = AgenticPhoneSearcher()
 phone = searcher.find_phone_number("ACME İNŞAAT A.Ş.")
 ```
 
 ## 📊 Çıktı Örneği
 
 ```
-✨ Agentic arama modu aktif (Web sitesi bulup iletişim sayfasına girecek)
+🆓 ✨ TAMAMEN ÜCRETSİZ Agentic arama modu aktif!
+   (Web sitesi bulup iletişim sayfasına girecek)
 
 🔍 [1/2] Aranıyor: 5 STAR METAL OTOMOTİV SANAYİ VE TİCARET LİMİTED ŞİRKETİ
 
@@ -144,8 +153,8 @@ phone = searcher.find_phone_number("ACME İNŞAAT A.Ş.")
 
 ```
 ┌─────────────────────────────────────────────┐
-│  1. Google'da şirket adını ara              │
-│     └─ SerpAPI kullanarak arama yap         │
+│  1. DuckDuckGo'da şirket adını ara          │
+│     └─ TAMAMEN ÜCRETSİZ - API KEY YOK!      │
 └─────────────────────────────────────────────┘
                     ↓
 ┌─────────────────────────────────────────────┐
@@ -209,11 +218,11 @@ searchPhoneNumber/
 
 ## 🐛 Hata Ayıklama
 
-### API Key Hatası
+### DuckDuckGo Bağlantı Hatası
 ```
-HATA (SerpAPI): Invalid API key
+⚠ DuckDuckGo arama hatası: ...
 ```
-**Çözüm:** `SERPAPI_KEY` değişkenini kontrol edin.
+**Çözüm:** İnternet bağlantınızı kontrol edin. DuckDuckGo erişilebilir olmalı.
 
 ### Timeout Hatası
 ```
