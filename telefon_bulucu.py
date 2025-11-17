@@ -1,7 +1,7 @@
 import pandas as pd
 import re
 import requests
-from duckduckgo_search import DDGS
+from ddgs import DDGS
 from agentic_search import AgenticPhoneSearcher
 
 # -----------------------------------
@@ -16,7 +16,7 @@ OUTPUT_EXCEL = "/mnt/data/firma_listesi_sonuclu.xlsx"
 USE_AGENTIC_SEARCH = True
 
 PHONE_REGEX = re.compile(
-    r"(\+90\s?\d{3}\s?\d{3}\s?\d{2}\s?\d{2}|0\s?\d{3}\s?\d{3}\s?\d{2}\s?\d{2})"
+    r"(?:\+90|0)?[\s\(\-]?\d{3}[\s\)\-]?\d{3}[\s\-]?\d{2}[\s\-]?\d{2}"
 )
 
 # -----------------------------------

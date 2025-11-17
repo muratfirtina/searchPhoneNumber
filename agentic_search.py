@@ -18,15 +18,16 @@ from bs4 import BeautifulSoup
 from urllib.parse import urljoin, urlparse
 import time
 from typing import Optional, List, Dict
-from duckduckgo_search import DDGS
+from ddgs import DDGS
 
 
 class AgenticPhoneSearcher:
     """Agentic telefon numarası arama sınıfı - TAMAMEN ÜCRETSİZ!"""
 
-    # Türk telefon numarası regex pattern
+    # Türk telefon numarası regex pattern (geliştirilmiş - parantez, tire destekli)
+    # Çok esnek - validation _clean_phone_number'da yapılacak
     PHONE_REGEX = re.compile(
-        r"(\+90\s?\d{3}\s?\d{3}\s?\d{2}\s?\d{2}|0\s?\d{3}\s?\d{3}\s?\d{2}\s?\d{2})"
+        r"(?:\+90|0)?[\s\(\-]?\d{3}[\s\)\-]?\d{3}[\s\-]?\d{2}[\s\-]?\d{2}"
     )
 
     # İletişim sayfası URL pattern'leri (Türkçe ve İngilizce)
@@ -340,7 +341,9 @@ class AgenticPhoneSearcher:
                 phone_text = href.replace('tel:', '').replace('Tel:', '')
                 match = self.PHONE_REGEX.search(phone_text)
                 if match:
-                    return self._clean_phone_number(match.group(0))
+                    cleaned = self._clean_phone_number(match.group(0))
+                    if cleaned:  # Geçerli numara mı kontrol et
+                        return cleaned
 
             # 2. Telefon ile ilgili class/id'lere sahip elementleri ara
             phone_keywords = ['phone', 'tel', 'telefon', 'contact', 'iletisim']
@@ -351,7 +354,9 @@ class AgenticPhoneSearcher:
                     text = elem.get_text()
                     match = self.PHONE_REGEX.search(text)
                     if match:
-                        return self._clean_phone_number(match.group(0))
+                        cleaned = self._clean_phone_number(match.group(0))
+                        if cleaned:
+                            return cleaned
 
                 # ID içinde anahtar kelime olanları bul
                 elements = soup.find_all(id=re.compile(keyword, re.I))
@@ -359,7 +364,9 @@ class AgenticPhoneSearcher:
                     text = elem.get_text()
                     match = self.PHONE_REGEX.search(text)
                     if match:
-                        return self._clean_phone_number(match.group(0))
+                        cleaned = self._clean_phone_number(match.group(0))
+                        if cleaned:
+                            return cleaned
 
             # 3. "Tel:", "Telefon:", "Phone:" gibi etiketlerin yanındaki numaraları ara
             text_content = soup.get_text()
@@ -368,7 +375,9 @@ class AgenticPhoneSearcher:
             if match:
                 phone_match = self.PHONE_REGEX.search(match.group(0))
                 if phone_match:
-                    return self._clean_phone_number(phone_match.group(0))
+                    cleaned = self._clean_phone_number(phone_match.group(0))
+                    if cleaned:
+                        return cleaned
 
             # 4. Contact/iletişim section'larını ara
             contact_sections = soup.find_all(['section', 'div'],
@@ -377,12 +386,16 @@ class AgenticPhoneSearcher:
                 text = section.get_text()
                 match = self.PHONE_REGEX.search(text)
                 if match:
-                    return self._clean_phone_number(match.group(0))
+                    cleaned = self._clean_phone_number(match.group(0))
+                    if cleaned:
+                        return cleaned
 
             # 5. Genel arama - tüm sayfa
             match = self.PHONE_REGEX.search(response.text)
             if match:
-                return self._clean_phone_number(match.group(0))
+                cleaned = self._clean_phone_number(match.group(0))
+                if cleaned:
+                    return cleaned
 
             return None
 
@@ -394,17 +407,66 @@ class AgenticPhoneSearcher:
 
     def _clean_phone_number(self, phone: str) -> str:
         """
-        Telefon numarasını temizle ve formatla
+        Telefon numarasını temizle, doğrula ve formatla
 
         Args:
             phone: Ham telefon numarası
 
         Returns:
-            Temizlenmiş telefon numarası
+            Temizlenmiş telefon numarası veya None (geçersizse)
         """
-        # Boşlukları kaldır ve standart formata getir
-        cleaned = re.sub(r'\s+', ' ', phone.strip())
-        return cleaned
+        if not phone:
+            return None
+
+        # Sadece rakamları al (tüm özel karakterleri kaldır)
+        numbers = re.sub(r'[^\d]', '', phone)
+
+        # Türk telefon numarası validasyonu
+        # Yerli format: 11 hane (0XXX YYY YY YY)
+        # - 0 (ön ek)
+        # - XXX (3 haneli alan kodu: 2XX, 3XX, 4XX, 5XX)
+        # - YYY YY YY (7 haneli numara)
+        # Uluslararası: 12 hane (90XXX YYY YY YY)
+
+        # Uzunluk kontrolü
+        if len(numbers) < 10 or len(numbers) > 12:
+            return None
+
+        # 1. 11 haneli yerli numara (0XXX YYY YY YY)
+        if len(numbers) == 11 and numbers.startswith('0'):
+            area_code = numbers[1:4]  # XXX kısmı
+
+            # Türk alan kodları kontrolü: 2XX, 3XX, 4XX, 5XX
+            if area_code[0] not in ['2', '3', '4', '5']:
+                return None
+
+            # Format: 0XXX YYY YY YY
+            return f"{numbers[0:4]} {numbers[4:7]} {numbers[7:9]} {numbers[9:11]}"
+
+        # 2. 10 haneli (eksik 0 ön eki - nadiren)
+        elif len(numbers) == 10:
+            # İlk 3 hane alan kodu olabilir
+            area_code = numbers[0:3]
+            if area_code[0] in ['2', '3', '4', '5']:
+                # 0 ekleyip 11 hane yap
+                numbers = '0' + numbers
+                return f"{numbers[0:4]} {numbers[4:7]} {numbers[7:9]} {numbers[9:11]}"
+            return None
+
+        # 3. 12 haneli uluslararası (90XXX YYY YY YY)
+        elif len(numbers) == 12 and numbers.startswith('90'):
+            area_code = numbers[2:5]  # XXX kısmı
+
+            # Alan kodu kontrolü
+            if area_code[0] not in ['2', '3', '4', '5']:
+                return None
+
+            # Format: +90 XXX YYY YY YY
+            return f"+90 {numbers[2:5]} {numbers[5:8]} {numbers[8:10]} {numbers[10:12]}"
+
+        else:
+            # Geçersiz format
+            return None
 
 
 # Standalone kullanım için yardımcı fonksiyon
