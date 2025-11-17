@@ -24,10 +24,10 @@ from ddgs import DDGS
 class AgenticPhoneSearcher:
     """Agentic telefon numarası arama sınıfı - TAMAMEN ÜCRETSİZ!"""
 
-    # Türk telefon numarası regex pattern (geliştirilmiş - parantez, tire destekli)
-    # Çok esnek - validation _clean_phone_number'da yapılacak
+    # Türk telefon numarası regex pattern (çok esnek - tüm formatları yakalar)
+    # Validation _clean_phone_number'da yapılacak
     PHONE_REGEX = re.compile(
-        r"(?:\+90|0)?[\s\(\-]?\d{3}[\s\)\-]?\d{3}[\s\-]?\d{2}[\s\-]?\d{2}"
+        r"(?:\+90\s?|0\s?)?[\s\(]?\d{3}[\s\)]?\s?\d{1,4}\s?\d{0,4}\s?\d{0,2}"
     )
 
     # İletişim sayfası URL pattern'leri (Türkçe ve İngilizce)
@@ -424,7 +424,9 @@ class AgenticPhoneSearcher:
         # Türk telefon numarası validasyonu
         # Yerli format: 11 hane (0XXX YYY YY YY)
         # - 0 (ön ek)
-        # - XXX (3 haneli alan kodu: 2XX, 3XX, 4XX, 5XX)
+        # - XXX (3 haneli alan kodu: TÜM Türkiye şehirleri)
+        #   Geçerli ilk rakamlar: 2, 3, 4, 5, 8
+        #   Geçersiz: 0, 1, 6, 7, 9
         # - YYY YY YY (7 haneli numara)
         # Uluslararası: 12 hane (90XXX YYY YY YY)
 
@@ -436,8 +438,10 @@ class AgenticPhoneSearcher:
         if len(numbers) == 11 and numbers.startswith('0'):
             area_code = numbers[1:4]  # XXX kısmı
 
-            # Türk alan kodları kontrolü: 2XX, 3XX, 4XX, 5XX
-            if area_code[0] not in ['2', '3', '4', '5']:
+            # TÜM Türk alan kodları kontrolü
+            # Geçerli ilk rakamlar: 2 (Marmara), 3 (İç Anadolu/Akdeniz),
+            #                       4 (Doğu/Güneydoğu), 5 (Mobil), 8 (Özel servisler)
+            if area_code[0] not in ['2', '3', '4', '5', '8']:
                 return None
 
             # Format: 0XXX YYY YY YY
@@ -447,7 +451,7 @@ class AgenticPhoneSearcher:
         elif len(numbers) == 10:
             # İlk 3 hane alan kodu olabilir
             area_code = numbers[0:3]
-            if area_code[0] in ['2', '3', '4', '5']:
+            if area_code[0] in ['2', '3', '4', '5', '8']:
                 # 0 ekleyip 11 hane yap
                 numbers = '0' + numbers
                 return f"{numbers[0:4]} {numbers[4:7]} {numbers[7:9]} {numbers[9:11]}"
@@ -457,8 +461,8 @@ class AgenticPhoneSearcher:
         elif len(numbers) == 12 and numbers.startswith('90'):
             area_code = numbers[2:5]  # XXX kısmı
 
-            # Alan kodu kontrolü
-            if area_code[0] not in ['2', '3', '4', '5']:
+            # Alan kodu kontrolü - TÜM Türk şehirleri
+            if area_code[0] not in ['2', '3', '4', '5', '8']:
                 return None
 
             # Format: +90 XXX YYY YY YY
