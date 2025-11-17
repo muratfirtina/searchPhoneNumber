@@ -46,11 +46,15 @@ class AgenticPhoneSearcher:
         'impressum'
     ]
 
-    # Türk telefon rehberi siteleri
+    # Türk telefon rehberi ve firma bulma siteleri
     PHONE_DIRECTORY_SITES = [
+        'tikla.com.tr',
+        'firmabulucu.com',
         'tdrehber.com',
         'telefonnumarasi.org.tr',
-        'bulurum.com'
+        'bulurum.com',
+        'rehber11.com',
+        'yellowpages.com.tr'
     ]
 
     def __init__(self, timeout: int = 10, max_pages: int = 5):
@@ -70,36 +74,164 @@ class AgenticPhoneSearcher:
 
     def find_phone_number(self, company_name: str) -> Optional[str]:
         """
-        Verilen şirket adı için telefon numarası bul
-
-        Arama Stratejisi:
-        1. Şirketin kendi web sitesini bul ve iletişim sayfalarını tara
-        2. DuckDuckGo genel arama sonuçlarından ara
+        Verilen şirket adı için TEK telefon numarası bul (geriye uyumluluk için)
 
         Args:
             company_name: Şirket adı
 
         Returns:
-            Bulunan telefon numarası veya None
+            Bulunan ilk telefon numarası veya None
         """
-        print(f"\n🔍 Agentic arama başlatılıyor: {company_name}")
+        phones = self.find_all_phone_numbers(company_name)
+        return phones[0] if phones else None
 
-        # NOT: Telefon rehberi araması devre dışı - yanlış sonuçlar veriyordu
-        # Direkt şirketin web sitesine gidiyoruz
+    def find_all_phone_numbers(self, company_name: str) -> List[str]:
+        """
+        Verilen şirket adı için BÜTÜN telefon numaralarını çoklu kaynaktan topla
 
-        # 1. Şirketin web sitesini bul
+        Arama Stratejisi:
+        1. Şirketin kendi web sitesinden (contact/iletişim sayfaları)
+        2. Telefon rehberi sitelerinden (tikla.com.tr, firmabulucu.com, tdrehber.com, vb.)
+        3. DuckDuckGo genel arama sonuçlarından
+
+        Args:
+            company_name: Şirket adı
+
+        Returns:
+            Bulunan telefon numaraları listesi (unique)
+        """
+        print(f"\n🔍 Çoklu kaynak arama başlatılıyor: {company_name}")
+
+        all_phones = []  # Tüm bulunan telefonlar
+
+        # 1. Şirketin KENDİ web sitesinden telefon topla
+        print("   🌐 Şirket web sitesi aranıyor...")
         website_url = self._find_company_website(company_name)
         if website_url:
-            print(f"   ✓ Web sitesi bulundu: {website_url}")
+            print(f"      ✓ Web sitesi: {website_url}")
+            phones = self._collect_phones_from_website(website_url)
+            if phones:
+                print(f"      ✅ {len(phones)} telefon bulundu")
+                all_phones.extend(phones)
+            else:
+                print(f"      ⚠ Telefon bulunamadı")
 
-            # 2. İletişim sayfalarını bul ve tara
-            phone = self._search_website_for_phone(website_url, company_name)
+        # 2. Telefon REHBERİ sitelerinden telefon topla
+        print("   📚 Telefon rehberi sitelerinde aranıyor...")
+        directory_phones = self._collect_phones_from_directories(company_name)
+        if directory_phones:
+            print(f"      ✅ Rehberlerde {len(directory_phones)} telefon bulundu")
+            all_phones.extend(directory_phones)
+
+        # Duplicate'leri temizle (aynı numarayı birden fazla yere yazma)
+        unique_phones = self._deduplicate_phones(all_phones)
+
+        if unique_phones:
+            print(f"   ✅ TOPLAM {len(unique_phones)} benzersiz telefon bulundu")
+            for i, phone in enumerate(unique_phones, 1):
+                print(f"      Tel{i}: {phone}")
+        else:
+            print("   ❌ Hiç telefon bulunamadı")
+
+        return unique_phones
+
+    def _collect_phones_from_website(self, base_url: str) -> List[str]:
+        """
+        Bir web sitesinden TÜM telefon numaralarını topla
+        (Ana sayfa + tüm iletişim sayfaları)
+
+        Args:
+            base_url: Web sitesi URL'i
+
+        Returns:
+            Bulunan telefon numaraları listesi
+        """
+        phones = []
+
+        # 1. Ana sayfadan telefon topla
+        phone = self._extract_phone_from_page(base_url)
+        if phone:
+            phones.append(phone)
+
+        # 2. İletişim sayfalarından telefon topla
+        contact_pages = self._find_contact_pages(base_url)
+        for page_url in contact_pages[:self.max_pages]:
+            phone = self._extract_phone_from_page(page_url)
             if phone:
-                print(f"   ✅ Telefon bulundu: {phone}")
-                return phone
+                phones.append(phone)
 
-        print("   ❌ Telefon bulunamadı")
-        return None
+        return phones
+
+    def _collect_phones_from_directories(self, company_name: str) -> List[str]:
+        """
+        Telefon rehberi sitelerinden TÜM telefon numaralarını topla
+
+        Args:
+            company_name: Şirket adı
+
+        Returns:
+            Bulunan telefon numaraları listesi
+        """
+        phones = []
+
+        try:
+            with DDGS() as ddgs:
+                for directory_site in self.PHONE_DIRECTORY_SITES:
+                    try:
+                        search_query = f"site:{directory_site} {company_name}"
+                        results = list(ddgs.text(
+                            search_query,
+                            region='tr-tr',
+                            safesearch='off',
+                            max_results=3
+                        ))
+
+                        if results:
+                            print(f"      → {directory_site} kontrol ediliyor...")
+
+                        # Bulunan sayfaları tara
+                        for result in results:
+                            link = result.get('href', '') or result.get('link', '')
+                            if link and directory_site in link:
+                                phone = self._extract_phone_from_page(link)
+                                if phone:
+                                    print(f"         ✓ Bulundu: {phone}")
+                                    phones.append(phone)
+
+                    except Exception as e:
+                        continue
+
+        except Exception as e:
+            pass
+
+        return phones
+
+    def _deduplicate_phones(self, phones: List[str]) -> List[str]:
+        """
+        Telefon numaralarını unique yap (aynı numarayı tekrar ekleme)
+
+        Args:
+            phones: Ham telefon listesi
+
+        Returns:
+            Unique telefon listesi
+        """
+        if not phones:
+            return []
+
+        # Sadece rakamları karşılaştır (format farkları ignore edilsin)
+        seen_numbers = set()
+        unique_phones = []
+
+        for phone in phones:
+            # Sadece rakamları al
+            digits = re.sub(r'[^\d]', '', phone)
+
+            if digits not in seen_numbers:
+                seen_numbers.add(digits)
+                unique_phones.append(phone)
+
+        return unique_phones
 
     def _search_phone_directories(self, company_name: str) -> Optional[str]:
         """

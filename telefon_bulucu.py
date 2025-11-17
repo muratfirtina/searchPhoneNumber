@@ -77,10 +77,12 @@ def find_phone_with_duckduckgo(query):
 df = pd.read_excel(INPUT_EXCEL)
 
 firma_col = df.columns[0]  # İlk kolon firma adıysa
-telefon_col = "Telefon"
 
-if telefon_col not in df.columns:
-    df[telefon_col] = ""
+# Birden fazla telefon kolonu ekle (Tel1, Tel2, Tel3, Tel4)
+PHONE_COLUMNS = ["Tel1", "Tel2", "Tel3", "Tel4"]
+for col in PHONE_COLUMNS:
+    if col not in df.columns:
+        df[col] = ""
 
 
 # -----------------------------------
@@ -101,24 +103,30 @@ for i, row in df.iterrows():
     firma = str(row[firma_col]).strip()
     print(f"🔍 [{i+1}/{len(df)}] Aranıyor: {firma}")
 
-    phone = None
+    phones = []
 
-    # Agentic arama kullan
+    # Agentic arama kullan (çoklu telefon toplama)
     if USE_AGENTIC_SEARCH and agentic_searcher:
-        phone = agentic_searcher.find_phone_number(firma)
+        phones = agentic_searcher.find_all_phone_numbers(firma)
 
-    # Agentic arama başarısız olduysa veya kullanılmıyorsa, standart DuckDuckGo aramayı dene
-    if not phone:
+    # Agentic arama başarısız olduysa, standart aramayı dene
+    if not phones:
         if USE_AGENTIC_SEARCH:
             print("   ⚠ Agentic arama başarısız, standart aramaya geçiliyor...")
         phone = find_phone_with_duckduckgo(firma)
+        if phone:
+            phones = [phone]
 
-    if phone:
-        print(f"   ✔ Bulundu: {phone}")
-        df.loc[i, telefon_col] = phone
+    # Bulunan telefonları kolonlara yaz
+    if phones:
+        print(f"   ✔ {len(phones)} telefon bulundu")
+        for idx, phone in enumerate(phones):
+            if idx < len(PHONE_COLUMNS):  # Maksimum 4 telefon
+                df.loc[i, PHONE_COLUMNS[idx]] = phone
+                print(f"      {PHONE_COLUMNS[idx]}: {phone}")
     else:
         print(f"   ✖ Bulunamadı")
-        df.loc[i, telefon_col] = "Bulunamadı"
+        df.loc[i, PHONE_COLUMNS[0]] = "Bulunamadı"
 
     print()  # Boş satır ekle
 
