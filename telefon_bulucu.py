@@ -32,7 +32,7 @@ def find_phone_with_duckduckgo(query):
         # DuckDuckGo ile arama
         with DDGS() as ddgs:
             results = list(ddgs.text(
-                keywords=query + " telefon",
+                query + " telefon",
                 region='tr-tr',
                 safesearch='off',
                 max_results=5

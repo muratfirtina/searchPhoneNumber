@@ -122,9 +122,9 @@ class AgenticPhoneSearcher:
                 # Telefon rehberi sitelerinde ara
                 for directory_site in self.PHONE_DIRECTORY_SITES:
                     try:
-                        query = f"site:{directory_site} {company_name}"
+                        search_query = f"site:{directory_site} {company_name}"
                         results = list(ddgs.text(
-                            keywords=query,
+                            search_query,
                             region='tr-tr',
                             safesearch='off',
                             max_results=3
@@ -165,7 +165,7 @@ class AgenticPhoneSearcher:
             # DuckDuckGo ile arama yap
             with DDGS() as ddgs:
                 results = list(ddgs.text(
-                    keywords=company_name,
+                    company_name,
                     region='tr-tr',
                     safesearch='off',
                     max_results=5
