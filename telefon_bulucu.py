@@ -2,6 +2,7 @@ import pandas as pd
 import re
 import requests
 from serpapi import GoogleSearch
+from agentic_search import AgenticPhoneSearcher
 
 # -----------------------------------
 # Ayarlar
@@ -10,6 +11,9 @@ SERPAPI_KEY = "BURAYA_API_KEYİNİ_YAZ"  # ← senin API key
 
 INPUT_EXCEL = "/mnt/data/firma_listesi.xlsx"
 OUTPUT_EXCEL = "/mnt/data/firma_listesi_sonuclu.xlsx"
+
+# Agentic arama kullanılsın mı? (True = Web sitesi bulup iletişim sayfasına girer)
+USE_AGENTIC_SEARCH = True
 
 PHONE_REGEX = re.compile(
     r"(\+90\s?\d{3}\s?\d{3}\s?\d{2}\s?\d{2}|0\s?\d{3}\s?\d{3}\s?\d{2}\s?\d{2})"
@@ -83,11 +87,30 @@ if telefon_col not in df.columns:
 # -----------------------------------
 # Firma Liste Tarama
 # -----------------------------------
+
+# Agentic searcher'ı başlat (eğer kullanılacaksa)
+agentic_searcher = None
+if USE_AGENTIC_SEARCH:
+    agentic_searcher = AgenticPhoneSearcher(SERPAPI_KEY)
+    print("✨ Agentic arama modu aktif (Web sitesi bulup iletişim sayfasına girecek)\n")
+else:
+    print("📋 Standart arama modu aktif (Sadece snippet'lerden arayacak)\n")
+
 for i, row in df.iterrows():
     firma = str(row[firma_col]).strip()
-    print(f"🔍 Aranıyor: {firma}")
+    print(f"🔍 [{i+1}/{len(df)}] Aranıyor: {firma}")
 
-    phone = find_phone_with_serpapi(firma)
+    phone = None
+
+    # Agentic arama kullan
+    if USE_AGENTIC_SEARCH and agentic_searcher:
+        phone = agentic_searcher.find_phone_number(firma)
+
+    # Agentic arama başarısız olduysa veya kullanılmıyorsa, eski yöntemi dene
+    if not phone:
+        if USE_AGENTIC_SEARCH:
+            print("   ⚠ Agentic arama başarısız, standart aramaya geçiliyor...")
+        phone = find_phone_with_serpapi(firma)
 
     if phone:
         print(f"   ✔ Bulundu: {phone}")
@@ -95,6 +118,8 @@ for i, row in df.iterrows():
     else:
         print(f"   ✖ Bulunamadı")
         df.loc[i, telefon_col] = "Bulunamadı"
+
+    print()  # Boş satır ekle
 
 
 # -----------------------------------
