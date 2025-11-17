@@ -73,9 +73,8 @@ class AgenticPhoneSearcher:
         Verilen şirket adı için telefon numarası bul
 
         Arama Stratejisi:
-        1. Türk telefon rehberi sitelerinde ara (daha hızlı ve güvenilir)
-        2. Şirketin kendi web sitesini bul ve iletişim sayfalarını tara
-        3. DuckDuckGo genel arama sonuçlarından ara
+        1. Şirketin kendi web sitesini bul ve iletişim sayfalarını tara
+        2. DuckDuckGo genel arama sonuçlarından ara
 
         Args:
             company_name: Şirket adı
@@ -85,19 +84,15 @@ class AgenticPhoneSearcher:
         """
         print(f"\n🔍 Agentic arama başlatılıyor: {company_name}")
 
-        # 1. Önce telefon rehberi sitelerinde ara
-        print("   📚 Telefon rehberi sitelerinde aranıyor...")
-        phone = self._search_phone_directories(company_name)
-        if phone:
-            print(f"   ✅ Telefon rehberinde bulundu: {phone}")
-            return phone
+        # NOT: Telefon rehberi araması devre dışı - yanlış sonuçlar veriyordu
+        # Direkt şirketin web sitesine gidiyoruz
 
-        # 2. Şirketin web sitesini bul
+        # 1. Şirketin web sitesini bul
         website_url = self._find_company_website(company_name)
         if website_url:
             print(f"   ✓ Web sitesi bulundu: {website_url}")
 
-            # 3. İletişim sayfalarını bul ve tara
+            # 2. İletişim sayfalarını bul ve tara
             phone = self._search_website_for_phone(website_url, company_name)
             if phone:
                 print(f"   ✅ Telefon bulundu: {phone}")
